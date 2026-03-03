@@ -230,30 +230,6 @@ module.exports = class extends Listener {
 						}
 					}
 				}
-
-				if (process.env.PUBLIC_BOT !== 'true' &&
-					!message.author.bot &&
-					!await isStaff(message.channel.guild, message.author.id)
-				) {
-					const key = `offline/${message.channel.id}`;
-					let online = 0;
-					for (const [, member] of message.channel.members) {
-						if (member.user.bot) continue;
-						if (!await isStaff(message.channel.guild, member.id)) continue;
-						if (member.presence && member.presence !== 'offline') online++;
-					}
-					if (online === 0 && ! await client.keyv.has(key)) {
-						await message.channel.send({
-							embeds: [
-								new EmbedBuilder()
-									.setColor(settings.primaryColour)
-									.setTitle(getMessage('ticket.offline.title'))
-									.setDescription(getMessage('ticket.offline.description')),
-							],
-						});
-						client.keyv.set(key, Date.now(), ms('1h'));
-					}
-				}
 			}
 
 			// auto-tag

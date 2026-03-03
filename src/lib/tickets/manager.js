@@ -549,7 +549,7 @@ module.exports = class TicketManager {
 			components: components.components.length >= 1 ? [components] : [],
 			content: getMessage('ticket.opening_message.content', {
 				creator: interaction.user.toString(),
-				staff: pings ? pings + ',' : '',
+				staff: '',
 			}),
 			embeds,
 		});
@@ -743,72 +743,6 @@ module.exports = class TicketManager {
 						}),
 				],
 			});
-		}
-
-		try {
-			const workingHours = category.guild.workingHours;
-			const timezone = workingHours[0];
-			workingHours.shift(); // remove timezone
-			const now = spacetime.now(timezone);
-			const currentHours = workingHours[now.day()];
-			const start = now.time(currentHours[0]);
-			const end = now.time(currentHours[1]);
-			let working = true;
-
-			if (currentHours[0] === currentHours[1] || now.isAfter(end)) { // staff have the day off or have finished for the day
-				// first look for the next working day *this* week (after today)
-				let nextIndex = workingHours.findIndex((hours, i) => i > now.day() && hours[0] !== hours[1]);
-				// if there isn't one, look for the next working day *next* week (before and including today's weekday)
-				if (!nextIndex) nextIndex = workingHours.findIndex((hours, i) => i <= now.day() && hours[0] !== hours[1]);
-				if (nextIndex) {
-					working = false;
-					const next = workingHours[nextIndex];
-					let then = now.add(nextIndex - now.day(), 'day');
-					if (nextIndex <= now.day()) then = then.add(1, 'week');
-					const timestamp = Math.ceil(then.time(next[0]).goto('utc').d.getTime() / 1000); // in seconds
-					channel.send({
-						embeds: [
-							new ExtendedEmbedBuilder()
-								.setColor(category.guild.primaryColour)
-								.setTitle(getMessage('ticket.working_hours.next.title'))
-								.setDescription(getMessage('ticket.working_hours.next.description', { timestamp })),
-						],
-					}).catch(this.client.log.error);
-				}
-			} else if (now.isBefore(start)) { // staff haven't started working yet
-				working = false;
-				const timestamp = Math.ceil(start.goto('utc').d.getTime() / 1000); // in seconds
-				channel.send({
-					embeds: [
-						new ExtendedEmbedBuilder()
-							.setColor(category.guild.primaryColour)
-							.setTitle(getMessage('ticket.working_hours.today.title'))
-							.setDescription(getMessage('ticket.working_hours.today.description', { timestamp })),
-					],
-				}).catch(this.client.log.error);
-			}
-
-			if (working && process.env.PUBLIC_BOT !== 'true') {
-				let online = 0;
-				for (const [, member] of channel.members) {
-					if (member.user.bot) continue;
-					if (!await isStaff(channel.guild, member.id)) continue;
-					if (member.presence && member.presence !== 'offline') online++;
-				}
-				if (online === 0) {
-					channel.send({
-						embeds: [
-							new ExtendedEmbedBuilder()
-								.setColor(category.guild.primaryColour)
-								.setTitle(getMessage('ticket.offline.title'))
-								.setDescription(getMessage('ticket.offline.description')),
-						],
-					}).catch(this.client.log.error);
-					this.client.keyv.set(`offline/${channel.id}`, Date.now(), ms('1h'));
-				}
-			}
-		} catch (error) {
-			this.client.log.error(error);
 		}
 	}
 
@@ -1130,66 +1064,24 @@ module.exports = class TicketManager {
 		// interaction could be command, button. or modal
 		const ticket = await this.getTicket(interaction.channel.id);
 		const getMessage = this.client.i18n.getLocale(ticket.guild.locale);
-		const staff = interaction.user.id !== ticket.createdById && await isStaff(interaction.guild, interaction.user.id);
-		const closeButtonId = {
-			action: 'close',
-			expect: staff ? 'user' : 'staff',
-		};
-		const embed = new ExtendedEmbedBuilder(/* {
-			iconURL: interaction.guild.iconURL(),
-			text: ticket.guild.footer,
-		} */)
-			.setColor(ticket.guild.primaryColour)
-			.setTitle(getMessage(`ticket.close.${staff ? 'staff' : 'user'}_request.title`, { requestedBy: interaction.member.displayName }));
 
-		if (staff) {
-			embed.setDescription(
-				getMessage('ticket.close.staff_request.description', { requestedBy: interaction.user.toString() }) +
-				(ticket.guild.archive ? getMessage('ticket.close.staff_request.archived') : ''),
-			);
-		}
-
-		const sent = await interaction.editReply({
-			components: [
-				new ActionRowBuilder()
-					.addComponents(
-						new ButtonBuilder()
-							.setCustomId(JSON.stringify({
-								accepted: true,
-								...closeButtonId,
-							}))
-							.setStyle(ButtonStyle.Success)
-							.setEmoji(getMessage('buttons.accept_close_request.emoji'))
-							.setLabel(getMessage('buttons.accept_close_request.text')),
-						new ButtonBuilder()
-							.setCustomId(JSON.stringify({
-								accepted: false,
-								...closeButtonId,
-							}))
-							.setStyle(ButtonStyle.Danger)
-							.setEmoji(getMessage('buttons.reject_close_request.emoji'))
-							.setLabel(getMessage('buttons.reject_close_request.text')),
-					),
+		await interaction.editReply({
+			components: [],
+			embeds: [
+				new ExtendedEmbedBuilder({
+					iconURL: interaction.guild.iconURL(),
+					text: ticket.guild.footer,
+				})
+					.setColor(ticket.guild.successColour)
+					.setTitle(getMessage('ticket.close.closed.title'))
+					.setDescription(getMessage('ticket.close.closed.description')),
 			],
-			content: staff ? `<@${ticket.createdById}>` : '', // ticket.category.pingRoles.map(r => `<@&${r}>`).join(' ')
-			embeds: [embed],
 		});
-
-		this.$stale.set(ticket.id, {
-			closeAt: ticket.guild.autoClose ? Date.now() + ticket.guild.autoClose : null,
-			closedBy: interaction.user.id, // null if set as stale due to inactivity
-			message: sent,
-			messages: 0,
+		await new Promise(resolve => setTimeout(resolve, 3e3));
+		return this.finallyClose(ticket.id, {
+			closedBy: interaction.user.id,
 			reason,
-			staleSince: Date.now(),
 		});
-
-		if (ticket.priority && ticket.priority !== 'LOW') {
-			await this.client.prisma.ticket.update({
-				data: { priority: 'LOW' },
-				where: { id: ticket.id },
-			});
-		}
 	}
 
 	/**
