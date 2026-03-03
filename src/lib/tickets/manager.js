@@ -1054,21 +1054,6 @@ module.exports = class TicketManager {
 	async requestClose(interaction, reason) {
 		// interaction could be command, button. or modal
 		const ticket = await this.getTicket(interaction.channel.id);
-		const getMessage = this.client.i18n.getLocale(ticket.guild.locale);
-
-		await interaction.editReply({
-			components: [],
-			embeds: [
-				new ExtendedEmbedBuilder({
-					iconURL: interaction.guild.iconURL(),
-					text: ticket.guild.footer,
-				})
-					.setColor(ticket.guild.successColour)
-					.setTitle(getMessage('ticket.close.closed.title'))
-					.setDescription(getMessage('ticket.close.closed.description')),
-			],
-		});
-		await new Promise(resolve => setTimeout(resolve, 3e3));
 		return this.finallyClose(ticket.id, {
 			closedBy: interaction.user.id,
 			reason,
@@ -1081,20 +1066,6 @@ module.exports = class TicketManager {
 	 * | import("discord.js").ModalSubmitInteraction} interaction
 	 */
 	async acceptClose(interaction) {
-		const ticket = await this.getTicket(interaction.channel.id);
-		const getMessage = this.client.i18n.getLocale(ticket.guild.locale);
-		await interaction.editReply({
-			embeds: [
-				new ExtendedEmbedBuilder({
-					iconURL: interaction.guild.iconURL(),
-					text: ticket.guild.footer,
-				})
-					.setColor(ticket.guild.successColour)
-					.setTitle(getMessage('ticket.close.closed.title'))
-					.setDescription(getMessage('ticket.close.closed.description')),
-			],
-		});
-		await new Promise(resolve => setTimeout(resolve, 3e3));
 		await this.finallyClose(interaction.channel.id, this.$stale.get(interaction.channel.id) || {});
 	}
 

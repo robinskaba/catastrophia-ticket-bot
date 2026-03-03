@@ -103,24 +103,24 @@ module.exports = class ForceCloseSlashCommand extends SlashCommand {
 				});
 			}
 
-			await interaction.editReply({
-				embeds: [
-					new ExtendedEmbedBuilder({
-						iconURL: interaction.guild.iconURL(),
-						text: settings.footer,
-					})
-						.setColor(settings.successColour)
-						.setTitle(getMessage('commands.slash.force-close.closed_one.title'))
-						.setDescription(getMessage('commands.slash.force-close.closed_one.description', { ticket: ticket.id })),
-				],
-			});
-
-			setTimeout(async () => {
-				await client.tickets.finallyClose(ticket.id, {
-					closedBy: interaction.user.id,
-					reason: interaction.options.getString('reason', false),
+			if (ticket.id !== interaction.channel.id) {
+				await interaction.editReply({
+					embeds: [
+						new ExtendedEmbedBuilder({
+							iconURL: interaction.guild.iconURL(),
+							text: settings.footer,
+						})
+							.setColor(settings.successColour)
+							.setTitle(getMessage('commands.slash.force-close.closed_one.title'))
+							.setDescription(getMessage('commands.slash.force-close.closed_one.description', { ticket: ticket.id })),
+					],
 				});
-			}, ms('3s'));
+			}
+
+			await client.tickets.finallyClose(ticket.id, {
+				closedBy: interaction.user.id,
+				reason: interaction.options.getString('reason', false),
+			});
 
 		} else if (interaction.options.getString('time', false)) { // if time option is passed
 			const time = ms(interaction.options.getString('time', false));
@@ -221,14 +221,13 @@ module.exports = class ForceCloseSlashCommand extends SlashCommand {
 							],
 							flags: MessageFlags.Ephemeral,
 						});
-						setTimeout(async () => {
-							for (const ticket of tickets) {
-								await client.tickets.finallyClose(ticket.id, {
-									closedBy: interaction.user.id,
-									reason: interaction.options.getString('reason', false),
-								});
-							}
-						}, ms('3s'));
+
+						for (const ticket of tickets) {
+							await client.tickets.finallyClose(ticket.id, {
+								closedBy: interaction.user.id,
+								reason: interaction.options.getString('reason', false),
+							});
+						}
 					} else {
 						await interaction.deleteReply();
 					}
@@ -271,24 +270,10 @@ module.exports = class ForceCloseSlashCommand extends SlashCommand {
 				});
 			}
 
-			await interaction.editReply({
-				embeds: [
-					new ExtendedEmbedBuilder({
-						iconURL: interaction.guild.iconURL(),
-						text: settings.footer,
-					})
-						.setColor(settings.successColour)
-						.setTitle(getMessage('commands.slash.force-close.closed_one.title'))
-						.setDescription(getMessage('commands.slash.force-close.closed_one.description', { ticket: ticket.id })),
-				],
+			await client.tickets.finallyClose(ticket.id, {
+				closedBy: interaction.user.id,
+				reason: interaction.options.getString('reason', false),
 			});
-
-			setTimeout(async () => {
-				await client.tickets.finallyClose(ticket.id, {
-					closedBy: interaction.user.id,
-					reason: interaction.options.getString('reason', false),
-				});
-			}, ms('3s'));
 		}
 	}
 };
