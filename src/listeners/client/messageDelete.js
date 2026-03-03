@@ -33,10 +33,15 @@ module.exports = class extends Listener {
 
 		let content = message.cleanContent;
 
-		const logEvent = (await message.guild.fetchAuditLogs({
-			limit: 1,
-			type: AuditLogEvent.MessageDelete,
-		})).entries.first();
+		let logEvent;
+		try {
+			logEvent = (await message.guild.fetchAuditLogs({
+				limit: 1,
+				type: AuditLogEvent.MessageDelete,
+			})).entries.first();
+		} catch {
+			// causes an error if no permission for fetchAuditLogs
+		}
 
 		if (ticket.guild.archive) {
 			try {
