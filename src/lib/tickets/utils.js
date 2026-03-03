@@ -28,7 +28,7 @@ module.exports = {
 		});
 		const getMessage = client.i18n.getLocale(settings.locale);
 		if (settings.categories.length === 0) {
-			interaction.reply({
+			const payload = {
 				components: [],
 				embeds: [
 					new EmbedBuilder()
@@ -37,8 +37,18 @@ module.exports = {
 						.setDescription(getMessage('misc.no_categories.description', { url: `${process.env.HTTP_EXTERNAL}/settings/${interaction.guildId}` })),
 				],
 				flags: MessageFlags.Ephemeral,
-			});
+			};
+			if (interaction.isChatInputCommand()) {
+				await interaction.reply(payload);
+			} else {
+				await interaction.update(payload);
+			}
 		} else if (settings.categories.length === 1) {
+			if (interaction.isChatInputCommand()) {
+				await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+			} else {
+				await interaction.deferUpdate();
+			}
 			await client.tickets.create({
 				categoryId: settings.categories[0].id,
 				interaction,
@@ -47,7 +57,7 @@ module.exports = {
 				topic,
 			});
 		} else {
-			await interaction.reply({
+			const payload = {
 				components: [
 					new ActionRowBuilder()
 						.setComponents(
@@ -71,7 +81,12 @@ module.exports = {
 						),
 				],
 				flags: MessageFlags.Ephemeral,
-			});
+			};
+			if (interaction.isChatInputCommand()) {
+				await interaction.reply(payload);
+			} else {
+				await interaction.update(payload);
+			}
 		}
 	},
 };

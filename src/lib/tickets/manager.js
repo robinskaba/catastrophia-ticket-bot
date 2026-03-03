@@ -371,7 +371,9 @@ module.exports = class TicketManager {
 		action, categoryId, interaction, topic, referencesMessageId, referencesTicketId,
 	}) {
 		const [, category] = await Promise.all([
-			interaction.deferReply({ flags: MessageFlags.Ephemeral }),
+			interaction.isChatInputCommand()
+				? interaction.deferReply({ flags: MessageFlags.Ephemeral })
+				: interaction.deferUpdate(),
 			this.getCategory(categoryId),
 		]);
 
@@ -680,18 +682,7 @@ module.exports = class TicketManager {
 		if (referencesTicketId) data.referencesTicket = { connect: { id: referencesTicketId } };
 		if (answers) data.questionAnswers = { createMany: { data: answers } };
 
-		await interaction.editReply({
-			components: [],
-			embeds: [
-				new ExtendedEmbedBuilder({
-					iconURL: guild.iconURL(),
-					text: category.guild.footer,
-				})
-					.setColor(category.guild.successColour)
-					.setTitle(getMessage('ticket.created.title'))
-					.setDescription(getMessage('ticket.created.description', { channel: channel.toString() })),
-			],
-		});
+		if (interaction.isChatInputCommand()) await interaction.deleteReply().catch(() => {});
 
 		try {
 			const ticket = await this.client.prisma.ticket.create({ data });
@@ -1249,18 +1240,6 @@ module.exports = class TicketManager {
 		if (ticket.feedback) dmEmbed.addFields(fields.feedback);
 		if (ticket.closedById) dmEmbed.addFields(fields.closedById);
 		if (reason) dmEmbed.addFields(fields.reason);
-
-		try {
-			const creator = guild.members.cache.get(ticket.createdById);
-			if (creator) {
-				await creator.send({
-					components,
-					embeds: [dmEmbed],
-				});
-			}
-		} catch (error) {
-			this.client.log.error(error);
-		}
 
 		const fieldsArray = [];
 		if (ticket.topic) fieldsArray.push(fields.topic);
