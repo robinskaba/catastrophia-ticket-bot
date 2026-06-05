@@ -116,6 +116,19 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 
 		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		ticketId = ticketId || interaction.options.getString('ticket', true);
+		const member = interaction.options.getUser('member');
+
+		const where = interaction.guildId && ticketId.length < 16
+			? {
+				guildId_number: {
+					guildId: interaction.guildId,
+					number: parseInt(ticketId),
+				},
+			}
+			: { id: ticketId };
+
+		if (member) where.createdById = member.id;
+
 		const ticket = await client.prisma.ticket.findUnique({
 			include: {
 				archivedChannels: true,
@@ -133,14 +146,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 				guild: true,
 				questionAnswers: { include: { question: true } },
 			},
-			where: interaction.guildId && ticketId.length < 16
-				? {
-					guildId_number: {
-						guildId: interaction.guildId,
-						number: parseInt(ticketId),
-					},
-				}
-				: { id: ticketId },
+			where,
 		});
 
 		if (!ticket) throw new Error(`Ticket ${ticketId} does not exist`);

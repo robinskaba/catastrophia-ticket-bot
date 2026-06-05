@@ -76,7 +76,8 @@ module.exports = class TicketCompleter extends Autocompleter {
 	 * @param {import("discord.js").AutocompleteInteraction} interaction
 	 */
 	async run(value, command, interaction) {
-		const otherMember = await isStaff(interaction.guild, interaction.user.id) && interaction.options.data[1]?.value;
+		const memberOption = interaction.options.get('member');
+		const otherMember = await isStaff(interaction.guild, interaction.user.id) && memberOption?.value;
 		const userId = otherMember || interaction.user.id;
 		await interaction.respond(
 			await this.getOptions(value, {

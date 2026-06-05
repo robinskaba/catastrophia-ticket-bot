@@ -19,6 +19,11 @@ function getTranscript(ticket) {
 	ticket.archivedMessages.forEach((message, i) => {
 		message.author = ticket.archivedUsers.find(u => u.userId === message.authorId);
 		message.content = JSON.parse(decrypt(message.content));
+		message.content.attachments?.forEach(a => {
+			a.match = function () {
+				return (val, render) => render(val).match(/image\/(png|jpe?g|gif|webp)/) ? render(val) : '';
+			};
+		});
 		message.text = message.content.content?.replace(/\n/g, '\n\t') ?? '';
 		message.content.attachments?.forEach(a => (message.text += '\n\t' + a.url));
 		message.content.embeds?.forEach(() => (message.text += '\n\t[embedded content]'));

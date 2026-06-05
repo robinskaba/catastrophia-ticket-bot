@@ -34,5 +34,5 @@ presence:
   status: online
 stats: true
 templates:
-  transcript: transcript.md
+  transcript: transcript.html
 updates: true

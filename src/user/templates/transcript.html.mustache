@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcript - {{ channelName }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #36393f;
+            color: #dcddde;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #2f3136;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #ffffff;
+            border-bottom: 1px solid #4f545c;
+            padding-bottom: 10px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+            background-color: #202225;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .info-item {
+            font-size: 0.9em;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #8e9297;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            display: block;
+        }
+        .message-list {
+            margin-top: 40px;
+        }
+        .message {
+            display: flex;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4f545c;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+            background-color: #4f545c;
+        }
+        .message-content {
+            flex-grow: 1;
+        }
+        .message-header {
+            margin-bottom: 5px;
+        }
+        .author-name {
+            font-weight: bold;
+            color: #ffffff;
+            margin-right: 10px;
+        }
+        .timestamp {
+            font-size: 0.75em;
+            color: #72767d;
+        }
+        .message-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+        .attachment {
+            margin-top: 10px;
+            max-width: 100%;
+        }
+        .attachment img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 4px;
+            display: block;
+        }
+        .attachment a {
+            color: #00aff4;
+            text-decoration: none;
+        }
+        .attachment a:hover {
+            text-decoration: underline;
+        }
+        .question-block {
+            background-color: #202225;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #009999;
+        }
+        .question-label {
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+        .question-value {
+            color: #dcddde;
+        }
+        .tag {
+            background-color: #5865f2;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7em;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ channelName }} Transcript</h1>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Ticket ID</span>
+                {{ ticket.id }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Category</span>
+                {{ ticket.category.name }} #{{ ticket.number }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Created At</span>
+                {{ #ticket }}{{ createdAtFull }}{{ /ticket }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Created By</span>
+                {{ #ticket.createdBy }}{{ displayName }} ({{ username }}#{{ discriminator }}){{ /ticket.createdBy }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Closed At</span>
+                {{ #ticket }}{{ closedAtFull }}{{ /ticket }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Closed By</span>
+                {{ #ticket.closedBy }}{{ displayName }} ({{ username }}#{{ discriminator }}){{ /ticket.closedBy }}{{ ^ticket.closedBy }}Automated{{ /ticket.closedBy }}
+            </div>
+            <div class="info-item">
+                <span class="info-label">Topic</span>
+                {{ #ticket.topic }}{{ . }}{{ /ticket.topic }}{{ ^ticket.topic }}No topic provided{{ /ticket.topic }}
+            </div>
+            {{ #ticket.feedback }}
+            <div class="info-item">
+                <span class="info-label">Feedback</span>
+                {{ rating }}/5 ⭐ - {{ comment }}{{ ^comment }}No comment{{ /comment }}
+            </div>
+            {{ /ticket.feedback }}
+        </div>
+
+        {{ #ticket.questionAnswers.length }}
+        <h2>Questions</h2>
+        {{ #ticket.questionAnswers }}
+        <div class="question-block">
+            <div class="question-label">{{ question.label }}</div>
+            <div class="question-value">{{ value }}{{ ^value }}<em>No answer</em>{{ /value }}</div>
+        </div>
+        {{ /ticket.questionAnswers }}
+        {{ /ticket.questionAnswers.length }}
+
+        <div class="message-list">
+            <h2>Messages</h2>
+            {{ #ticket.archivedMessages }}
+            <div class="message">
+                <img class="avatar" src="{{ author.avatar }}" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="author-name">{{ author.displayName }}</span>
+                        <span class="timestamp">{{ createdAtTimestamp }}</span>
+                        {{#author.bot}}<span class="tag">BOT</span>{{/author.bot}}
+                    </div>
+                    <div class="message-text">{{ content.content }}</div>
+                    
+                    {{ #content.attachments }}
+                    <div class="attachment">
+                        {{ #url }}
+                            {{ #contentType }}
+                                {{ #match }}
+                                    <img src="{{ url }}" alt="Attachment">
+                                {{ /match }}
+                            {{ /contentType }}
+                            {{ ^match }}
+                                <a href="{{ url }}" target="_blank">Download Attachment ({{ filename }})</a>
+                            {{ /match }}
+                        {{ /url }}
+                    </div>
+                    {{ /content.attachments }}
+
+                    {{ #content.embeds.length }}
+                    <div class="info-item" style="margin-top: 10px; color: #72767d; font-style: italic;">
+                        [Embedded Content]
+                    </div>
+                    {{ /content.embeds.length }}
+                </div>
+            </div>
+            {{ /ticket.archivedMessages }}
+        </div>
+    </div>
+</body>
+</html>
