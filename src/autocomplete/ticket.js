@@ -37,7 +37,12 @@ module.exports = class TicketCompleter extends Autocompleter {
 				where: { id: guildId },
 			});
 			tickets = await client.prisma.ticket.findMany({
-				include: { category: true },
+				include: {
+					archivedUsers: true,
+					category: true,
+					createdBy: true,
+				},
+				orderBy: { createdAt: 'desc' },
 				where: {
 					createdById: userId,
 					guildId,
@@ -49,19 +54,31 @@ module.exports = class TicketCompleter extends Autocompleter {
 				tickets
 					.filter(ticket => cmd.shouldAllowAccess(interaction, ticket))
 					.map(async ticket => {
-						const getTopic = async () => (await crypto.queue(w => w.decrypt(ticket.topic))).replace(/\n/g, ' ').substring(0, 50);
 						const date = new Date(ticket.createdAt).toLocaleString([locale, 'en-GB'], { dateStyle: 'short' });
-						const topic = ticket.topic ? '- ' + (await getTopic()) : '';
-						const category = emoji.hasEmoji(ticket.category.emoji) ? emoji.get(ticket.category.emoji) + ' ' + ticket.category.name : ticket.category.name;
-						ticket._name = `${category} #${ticket.number} (${date}) ${topic}`;
+						const topic = ticket.topic ? '- ' + (await crypto.queue(w => w.decrypt(ticket.topic))).replace(/\n/g, ' ').substring(0, 50) : '';
+						
+						let creatorDisplayName = ticket.createdBy?.username || 'unknown';
+						const archivedCreator = ticket.archivedUsers?.find(u => u.userId === ticket.createdById);
+						if (archivedCreator?.displayName) {
+							creatorDisplayName = await crypto.queue(w => w.decrypt(archivedCreator.displayName));
+						}
+
+						const channelName = ticket.category.channelName
+							.replace(/{+\s?(user)?name\s?}+/gi, ticket.createdBy?.username || 'unknown')
+							.replace(/{+\s?(nick|display)(name)?\s?}+/gi, creatorDisplayName)
+							.replace(/{+\s?num(ber)?\s?}+/gi, ticket.number);
+						ticket._name = `#${channelName} (${date}) ${topic}`;
 						return ticket;
-					}),
+					})
 			);
+			
+			// Filter out broken tickets (e.g. unknown creator)
+			tickets = tickets.filter(t => !t._name.includes('unknown'));
 
 			this.cache.set(cacheKey, tickets, ms('1m'));
 		}
 
-		const options = value ? tickets.filter(t => t._name.match(new RegExp(value, 'i'))) : tickets;
+		const options = value ? tickets.filter(t => t._name.toLowerCase().includes(value.toLowerCase())) : tickets;
 		return options
 			.slice(0, 25)
 			.map(t => ({

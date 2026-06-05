@@ -6,6 +6,9 @@ if (process.env.DISABLE_ENCRYPTION === 'true') {
 	encrypt = data => data;
 	decrypt = data => data;
 } else {
+	if (!process.env.ENCRYPTION_KEY) {
+		throw new Error('ENCRYPTION_KEY environment variable is not set');
+	}
 	const cryptr = new Cryptr(process.env.ENCRYPTION_KEY);
 	decrypt = cryptr.decrypt.bind(cryptr);
 	encrypt = cryptr.encrypt.bind(cryptr);

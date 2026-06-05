@@ -407,8 +407,7 @@ module.exports = class TicketManager {
 			.replace(/{+\s?(nick|display)(name)?\s?}+/gi, creator.displayName)
 			.replace(/{+\s?num(ber)?\s?}+/gi, number === 1488 ? '1487b' : number);
 		const allow = ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'EmbedLinks', 'AttachFiles'];
-		/** @type {import("discord.js").TextChannel} */
-		const channel = await guild.channels.create({
+		const channelOptions = {
 			name: channelName,
 			parent: category.discordCategory,
 			permissionOverwrites: [
@@ -432,7 +431,21 @@ module.exports = class TicketManager {
 			rateLimitPerUser: category.ratelimit,
 			reason: `${creator.user.tag} created a ticket`,
 			topic: `${creator}${topic?.length > 0 ? ` | ${topic}` : ''}`,
-		});
+		};
+
+		/** @type {import("discord.js").TextChannel} */
+		let channel;
+		try {
+			channel = await guild.channels.create(channelOptions);
+		} catch (error) {
+			if (error.code === 50035) {
+				this.client.log.warn(`[TICKETS] Failed to create channel with name "${channelName}", falling back to generic name.`);
+				channelOptions.name = `ticket-${number === 1488 ? '1487b' : number}`;
+				channel = await guild.channels.create(channelOptions);
+			} else {
+				throw error;
+			}
+		}
 
 		const needsStats = /{+\s?(avgResponseTime|avgResolutionTime|avgRating)\s?}+/i.test(category.openingMessage);
 		const statsCacheKey = `cache/category-stats/${categoryId}`;

@@ -90,12 +90,29 @@ if(sentryEnabled) {
 const Client = require('./client');
 const http = require('./http');
 
-// the `user` directory may or may not exist depending on if sqlite is being used.
 // copy any files that don't already exist
 fs.cpSync(path.join(__dirname, 'user'), './user', {
 	force: false,
 	recursive: true,
 });
+
+// ensure templates are always updated
+fs.cpSync(path.join(__dirname, 'user/templates'), './user/templates', {
+	force: true,
+	recursive: true,
+});
+
+// force the config to use html template
+try {
+	const configPath = './user/config.yml';
+	let content = fs.readFileSync(configPath, 'utf8');
+	if (content.includes('transcript: transcript.md')) {
+		content = content.replace('transcript: transcript.md', 'transcript: transcript.html');
+		fs.writeFileSync(configPath, content);
+	}
+} catch (e) {
+	// ignore
+}
 
 // initialise the framework and client,
 // which also loads the custom config and creates a new Logger.

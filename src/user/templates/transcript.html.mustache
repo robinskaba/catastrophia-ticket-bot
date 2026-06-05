@@ -192,16 +192,12 @@
                     
                     {{ #content.attachments }}
                     <div class="attachment">
-                        {{ #url }}
-                            {{ #contentType }}
-                                {{ #match }}
-                                    <img src="{{ url }}" alt="Attachment">
-                                {{ /match }}
-                            {{ /contentType }}
-                            {{ ^match }}
-                                <a href="{{ url }}" target="_blank">Download Attachment ({{ filename }})</a>
-                            {{ /match }}
-                        {{ /url }}
+                        {{ #isImage }}
+                            <a href="{{ url }}" target="_blank"><img src="{{ url }}" alt="Attachment ({{ filename }})"></a>
+                        {{ /isImage }}
+                        {{ ^isImage }}
+                            <a href="{{ url }}" target="_blank">Download Attachment ({{ filename }})</a>
+                        {{ /isImage }}
                     </div>
                     {{ /content.attachments }}
 

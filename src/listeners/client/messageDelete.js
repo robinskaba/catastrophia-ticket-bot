@@ -45,7 +45,7 @@ module.exports = class extends Listener {
 
 		if (ticket.guild.archive) {
 			try {
-				await client.prisma.archivedMessage.update({
+				await client.prisma.archivedMessage.updateMany({
 					data: { deleted: true },
 					where: { id: message.id },
 				});
@@ -57,12 +57,8 @@ module.exports = class extends Listener {
 					}
 				}
 			} catch (error) {
-				if ((error.meta?.cause || error.cause) === 'Record to update not found.') {
-					client.log.warn(`Archived message ${message.id} can't be marked as deleted because it doesn't exist`);
-				} else {
-					client.log.warn('Failed to "delete" archived message', message.id);
-					client.log.error(error);
-				}
+				client.log.warn('Failed to "delete" archived message', message.id);
+				client.log.error(error);
 			}
 		}
 

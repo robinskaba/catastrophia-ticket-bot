@@ -25,15 +25,15 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			nameLocalizations: client.i18n.getAllMessages(`commands.slash.${name}.name`),
 			options: [
 				{
+					name: 'member',
+					required: true,
+					type: ApplicationCommandOptionType.User,
+				},
+				{
 					autocomplete: true,
 					name: 'ticket',
 					required: true,
 					type: ApplicationCommandOptionType.String,
-				},
-				{
-					name: 'member',
-					required: false,
-					type: ApplicationCommandOptionType.User,
 				},
 			].map(option => {
 				option.descriptionLocalizations = client.i18n.getAllMessages(`commands.slash.${name}.options.${option.name}.description`);
@@ -44,18 +44,29 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 		});
 
 		Mustache.escape = text => text; // don't HTML-escape
-		this.template = fs.readFileSync(
-			join('./user/templates/', this.client.config.templates.transcript + '.mustache'),
-			{ encoding: 'utf8' },
-		);
+		
+		const templateName = this.client.config.templates.transcript + '.mustache';
+		const paths = [
+			join('./user/templates/', templateName),
+			join(__dirname, '../../user/templates/', templateName),
+			join(__dirname, '../../user/templates/transcript.html.mustache'), // fallback to HTML
+		];
+
+		for (const p of paths) {
+			if (fs.existsSync(p)) {
+				this.template = fs.readFileSync(p, { encoding: 'utf8' });
+				break;
+			}
+		}
+
+		if (!this.template) {
+			throw new Error(`Template not found in any of the following paths: ${paths.join(', ')}`);
+		}
 	}
 
 	shouldAllowAccess(interaction, ticket) {
-		// the creator can always get their ticket, even from outside the guild
-		if (ticket.createdById === interaction.user.id) return true; // user not member (DMs)
-		// everyone else must be in the guild
+		if (ticket.createdById === interaction.user.id) return true;
 		if (interaction.guild?.id !== ticket.guildId) return false;
-		// and have authority
 		if (interaction.client.supers.includes(interaction.member.id)) return true;
 		if (interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return true;
 		if (interaction.member.roles.cache.filter(role => ticket.category.staffRoles.includes(role.id)).size > 0) return true;
@@ -63,19 +74,32 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 	}
 
 	async fillTemplate(ticket) {
-		/** @type {import("client")} */
 		const client = this.client;
 
-		ticket = await pool.queue(w => w(ticket));
+		ticket = await pool.queue(w => w({
+			encryptionKey: process.env.ENCRYPTION_KEY,
+			ticket,
+		}));
+
+		// Set isImage flag on attachments so they can be easily rendered in the template
+		ticket.archivedMessages?.forEach(msg => {
+			msg.content?.attachments?.forEach(a => {
+				a.isImage = !!a.contentType?.match(/image\/(png|jpe?g|gif|webp)/i);
+			});
+		});
 
 		const channelName = ticket.category.channelName
-			.replace(/{+\s?(user)?name\s?}+/gi, ticket.createdBy?.username)
-			.replace(/{+\s?(nick|display)(name)?\s?}+/gi, ticket.createdBy?.displayName)
+			.replace(/{+\s?(user)?name\s?}+/gi, ticket.createdBy?.username || 'unknown')
+			.replace(/{+\s?(nick|display)(name)?\s?}+/gi, ticket.createdBy?.displayName || ticket.createdBy?.username || 'unknown')
 			.replace(/{+\s?num(ber)?\s?}+/gi, ticket.number);
-		const fileName = `${channelName}.${this.client.config.templates.transcript.split('.').slice(-1)[0]}`;
+		
+		const extension = this.template.includes('<!DOCTYPE html>') ? 'html' : this.client.config.templates.transcript.split('.').slice(-1)[0];
+		const fileName = `${channelName}.${extension}`;
+		
 		const transcript = Mustache.render(this.template, {
 			channelName,
 			closedAtFull: function () {
+				if (!this.closedAt) return 'N/A';
 				return new Intl.DateTimeFormat([ticket.guild.locale, 'en-GB'], {
 					dateStyle: 'full',
 					timeStyle: 'long',
@@ -83,6 +107,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 				}).format(this.closedAt);
 			},
 			createdAtFull: function () {
+				if (!this.createdAt) return 'N/A';
 				return new Intl.DateTimeFormat([ticket.guild.locale, 'en-GB'], {
 					dateStyle: 'full',
 					timeStyle: 'long',
@@ -90,6 +115,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 				}).format(this.createdAt);
 			},
 			createdAtTimestamp: function () {
+				if (!this.createdAt) return 'N/A';
 				return new Intl.DateTimeFormat([ticket.guild.locale, 'en-GB'], {
 					dateStyle: 'short',
 					timeStyle: 'long',
@@ -107,11 +133,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 		};
 	}
 
-	/**
-	 * @param {import("discord.js").ChatInputCommandInteraction} interaction
-	 */
 	async run(interaction, ticketId) {
-		/** @type {import("client")} */
 		const client = this.client;
 
 		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -127,7 +149,35 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			}
 			: { id: ticketId };
 
-		if (member) where.createdById = member.id;
+		if (member) {
+			if (where.id) {
+				const ticket = await client.prisma.ticket.findFirst({
+					include: {
+						archivedChannels: true,
+						archivedMessages: {
+							orderBy: { createdAt: 'asc' },
+							where: { external: false },
+						},
+						archivedRoles: true,
+						archivedUsers: true,
+						category: true,
+						claimedBy: true,
+						closedBy: true,
+						createdBy: true,
+						feedback: true,
+						guild: true,
+						questionAnswers: { include: { question: true } },
+					},
+					where: {
+						...where,
+						createdById: member.id,
+					},
+				});
+				return this.handleResult(interaction, ticket, ticketId);
+			} else {
+				where.createdById = member.id;
+			}
+		}
 
 		const ticket = await client.prisma.ticket.findUnique({
 			include: {
@@ -149,6 +199,11 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			where,
 		});
 
+		return this.handleResult(interaction, ticket, ticketId);
+	}
+
+	async handleResult(interaction, ticket, ticketId) {
+		const client = this.client;
 		if (!ticket) throw new Error(`Ticket ${ticketId} does not exist`);
 
 		if (!this.shouldAllowAccess(interaction, ticket)) {
@@ -167,15 +222,41 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			});
 		}
 
+		// 1. If no messages in archive, try to fetch from channel (LIVE RECOVERY)
+		if (ticket.archivedMessages.length === 0 && ticket.open) {
+			const channel = client.channels.cache.get(ticket.id);
+			if (channel) {
+				const messages = await channel.messages.fetch({ limit: 100 });
+				for (const m of messages.values()) {
+					await client.tickets.archiver.saveMessage(ticket.id, m);
+				}
+				// Refresh ticket data
+				const updatedTicket = await client.prisma.ticket.findUnique({
+					include: {
+						archivedChannels: true,
+						archivedMessages: { orderBy: { createdAt: 'asc' }, where: { external: false } },
+						archivedRoles: true,
+						archivedUsers: true,
+						category: true,
+						claimedBy: true,
+						closedBy: true,
+						createdBy: true,
+						feedback: true,
+						guild: true,
+						questionAnswers: { include: { question: true } },
+					},
+					where: { id: ticket.id },
+				});
+				if (updatedTicket) ticket = updatedTicket;
+			}
+		}
+
 		const {
 			fileName,
 			transcript,
 		} = await this.fillTemplate(ticket);
-		const attachment = new AttachmentBuilder()
-			.setFile(Buffer.from(transcript))
-			.setName(fileName);
+		const attachment = new AttachmentBuilder(Buffer.from(transcript), { name: fileName });
 
 		await interaction.editReply({ files: [attachment] });
-		// TODO: add portal link
 	}
 };
