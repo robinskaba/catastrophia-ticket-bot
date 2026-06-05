@@ -47,6 +47,7 @@ module.exports = async function handleStaleTickets(client, staleInterval) {
 							],
 						});
 					} else if ($.closeAt < Date.now()) {
+						client.log.info.cron(`Auto-closing stale ticket ${ticket.id} in guild ${guild.id}`);
 						await client.tickets.finallyClose(ticket.id, $);
 						closed++;
 					}
@@ -59,6 +60,11 @@ module.exports = async function handleStaleTickets(client, staleInterval) {
 						closed++;
 						continue;
 					}
+
+					if (!guild.autoClose) {
+						client.log.warn.cron(`Ticket ${ticket.id} is stale, but autoClose is disabled for guild ${guild.id}`);
+					}
+
 					const messages = (await channel.messages.fetch({ limit: 5 })).filter(m => m.author.id !== client.user.id);
 					let ping = '';
 
