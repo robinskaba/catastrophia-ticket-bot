@@ -7,6 +7,7 @@ const {
 	},
 	ChannelType: { GuildText },
 	EmbedBuilder,
+	PermissionsBitField,
 	StringSelectMenuBuilder,
 	StringSelectMenuOptionBuilder,
 } = require('discord.js');
@@ -19,6 +20,15 @@ module.exports.post = fastify => ({
 		const client = req.routeOptions.config.client;
 		const guild = client.guilds.cache.get(req.params.guild);
 		const data = req.body;
+
+		const me = await guild.members.fetch(client.user.id);
+		if (me.communicationDisabledUntilTimestamp > Date.now()) {
+			return res.code(403).send({
+				error: 'Forbidden',
+				message: 'The operation failed because the bot is currently timed out in this server.',
+				statusCode: 403,
+			});
+		}
 
 		const settings = await client.prisma.guild.findUnique({
 			select: {
@@ -38,19 +48,26 @@ module.exports.post = fastify => ({
 		if (categories.length === 0) throw new Error('No categories');
 		if (categories.length !== 1 && data.type === 'MESSAGE') throw new Error('Invalid number of categories for panel type');
 
-		/** @type {import("discord.js").TextChannel} */
+		/** @type {import("discord.js").TextBasedChannel} */
 		let channel;
 		if (data.channel) {
 			channel = await client.channels.fetch(data.channel);
+			if (!channel.isTextBased()) {
+				return res.code(400).send({
+					error: 'Bad Request',
+					message: 'The selected channel is not a text-based channel.',
+					statusCode: 400,
+				});
+			}
 		} else {
-			const allow = ['ViewChannel', 'ReadMessageHistory'];
-			if (data.type === 'MESSAGE') allow.push('SendMessages');
+			const allow = [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory];
+			if (data.type === 'MESSAGE') allow.push(PermissionsBitField.Flags.SendMessages);
 			channel = await guild.channels.create({
 				name: 'create-a-ticket',
 				permissionOverwrites: [
 					{
 						allow,
-						deny: ['AddReactions', 'AttachFiles'],
+						deny: [PermissionsBitField.Flags.AddReactions, PermissionsBitField.Flags.AttachFiles],
 						id: guild.roles.everyone,
 					},
 				],
@@ -58,6 +75,15 @@ module.exports.post = fastify => ({
 				rateLimitPerUser: 15,
 				reason: 'New ticket panel',
 				type: GuildText,
+			});
+		}
+
+		const permissions = me.permissionsIn(channel);
+		if (!permissions.has([PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.EmbedLinks])) {
+			return res.code(403).send({
+				error: 'Forbidden',
+				message: 'The bot lacks the "Send Messages" or "Embed Links" permissions in the destination channel.',
+				statusCode: 403,
 			});
 		}
 
@@ -133,6 +159,14 @@ module.exports.post = fastify => ({
 				});
 			} catch (error) {
 				if (!data.channel) await channel.delete('Failed to send panel');
+
+				if (error.code === 50013) {
+					return res.code(403).send({
+						error: 'Forbidden',
+						message: 'Discord returned a "Missing Permissions" error. Please check that the bot has all required permissions and that the server doesn\'t have a 2FA requirement enabled for moderation (which can restrict bots whose owners don\'t have 2FA).',
+						statusCode: 403,
+					});
+				}
 
 				const human_errors = [];
 				const action_row = error?.rawError?.errors?.components?.['0'];
