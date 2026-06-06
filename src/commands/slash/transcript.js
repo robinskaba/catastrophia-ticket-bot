@@ -88,6 +88,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 				if (!msg.content?.attachments) continue;
 				for (const a of msg.content.attachments) {
 					a.isImage = !!a.contentType?.match(/image\/(png|jpe?g|gif|webp)/i);
+					a.isVideo = !!a.contentType?.match(/video\/(mp4|webm|ogg|quicktime|mov)/i);
 					if (a.isImage && !(a.url || a.attachment)?.startsWith('data:')) {
 						const localPath = join(process.cwd(), 'user', 'attachments', `${a.id}_${a.filename}`);
 						if (fs.existsSync(localPath)) {

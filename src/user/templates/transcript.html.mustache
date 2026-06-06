@@ -128,7 +128,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>{{ channelName }} Transcript</h1>
+        <h1>{{ channelName }}</h1>
         
         <div class="info-grid">
             <div class="info-item">
@@ -155,10 +155,7 @@
                 <span class="info-label">Closed By</span>
                 {{ #ticket.closedBy }}{{ displayName }} ({{ username }}#{{ discriminator }}){{ /ticket.closedBy }}{{ ^ticket.closedBy }}Automated{{ /ticket.closedBy }}
             </div>
-            <div class="info-item">
-                <span class="info-label">Topic</span>
-                {{ #ticket.topic }}{{ . }}{{ /ticket.topic }}{{ ^ticket.topic }}No topic provided{{ /ticket.topic }}
-            </div>
+
             {{ #ticket.feedback }}
             <div class="info-item">
                 <span class="info-label">Feedback</span>
@@ -196,7 +193,15 @@
                             <a href="{{ url }}" target="_blank"><img src="{{ url }}" alt="Attachment ({{ filename }})"></a>
                         {{ /isImage }}
                         {{ ^isImage }}
-                            <a href="{{ url }}" target="_blank">Download Attachment ({{ filename }})</a>
+                            {{ #isVideo }}
+                                <video controls style="max-width: 100%; max-height: 500px; border-radius: 4px;">
+                                    <source src="{{ url }}" type="{{ contentType }}">
+                                    Your browser does not support the video tag.
+                                </video>
+                            {{ /isVideo }}
+                            {{ ^isVideo }}
+                                <a href="{{ url }}" target="_blank">Download Attachment ({{ filename }})</a>
+                            {{ /isVideo }}
                         {{ /isImage }}
                     </div>
                     {{ /content.attachments }}
