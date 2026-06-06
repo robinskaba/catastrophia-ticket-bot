@@ -147,12 +147,14 @@ module.exports = class TicketArchiver {
 					url: a.url || a.attachment,
 				};
 				if (att.contentType?.match(/image\/(png|jpe?g|gif|webp)/i)) {
-					// download to local disk instead of db to avoid P2000 text limit
-					fetch(att.url).then(res => res.ok ? res.arrayBuffer() : null).then(buffer => {
-						if (buffer) {
-							fs.writeFileSync(join(userAttachmentsDir, `${att.id}_${att.filename}`), Buffer.from(buffer));
+					// download to local disk via stream to prevent RAM spikes
+					const destPath = join(userAttachmentsDir, `${att.id}_${att.filename}`);
+					require('https').get(att.url, (res) => {
+						if (res.statusCode === 200) {
+							const fileStream = fs.createWriteStream(destPath);
+							res.pipe(fileStream);
 						}
-					}).catch(() => {});
+					}).on('error', () => {});
 				}
 				attachments.push(att);
 			}
