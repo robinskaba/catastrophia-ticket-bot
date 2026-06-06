@@ -812,15 +812,7 @@ module.exports = class TicketManager {
 				);
 			}
 
-			if (ticket.guild.claimButton && ticket.category.claiming) {
-				components.addComponents(
-					new ButtonBuilder()
-						.setCustomId(JSON.stringify({ action: 'unclaim' }))
-						.setStyle(ButtonStyle.Secondary)
-						.setEmoji(getMessage('buttons.unclaim.emoji'))
-						.setLabel(getMessage('buttons.unclaim.text')),
-				);
-			}
+
 
 			if (ticket.guild.closeButton) {
 				components.addComponents(
@@ -853,101 +845,7 @@ module.exports = class TicketManager {
 		});
 	}
 
-	/**
-	 * @param {import("discord.js").ChatInputCommandInteraction|import("discord.js").ButtonInteraction} interaction
-	 */
-	async release(interaction) {
-		const ticket = await this.client.prisma.ticket.findUnique({
-			include: {
-				_count: { select: { questionAnswers: true } },
-				category: true,
-				guild: true,
-			},
-			where: { id: interaction.channel.id },
-		});
-		const getMessage = this.client.i18n.getLocale(ticket.guild.locale);
 
-		if (!(await isStaff(interaction.guild, interaction.user.id))) { // if user is not staff
-			return await interaction.reply({
-				embeds: [
-					new ExtendedEmbedBuilder({
-						iconURL: interaction.guild.iconURL(),
-						text: ticket.guild.footer,
-					})
-						.setColor(ticket.guild.errorColour)
-						.setTitle(getMessage('commands.slash.claim.not_staff.title'))
-						.setDescription(getMessage('commands.slash.claim.not_staff.description')),
-				],
-				flags: MessageFlags.Ephemeral,
-			});
-		}
-
-		await interaction.deferReply();
-
-		await Promise.all([
-			interaction.channel.permissionOverwrites.delete(interaction.user, `Ticket released by ${interaction.user.tag}`),
-			...ticket.category.staffRoles.map(role => interaction.channel.permissionOverwrites.edit(role, { 'ViewChannel': true }, `Ticket released by ${interaction.user.tag}`)),
-			this.client.prisma.ticket.update({
-				data: { claimedBy: { disconnect: true } },
-				where: { id: interaction.channel.id },
-			}),
-		]);
-
-		const openingMessage = await interaction.channel.messages.fetch(ticket.openingMessageId);
-
-		if (openingMessage && openingMessage.components.length !== 0) {
-			const components = new ActionRowBuilder();
-
-			if (ticket.topic || ticket._count.questionAnswers !== 0) {
-				components.addComponents(
-					new ButtonBuilder()
-						.setCustomId(JSON.stringify({ action: 'edit' }))
-						.setStyle(ButtonStyle.Secondary)
-						.setEmoji(getMessage('buttons.edit.emoji'))
-						.setLabel(getMessage('buttons.edit.text')),
-				);
-			}
-
-			if (ticket.guild.claimButton && ticket.category.claiming) {
-				components.addComponents(
-					new ButtonBuilder()
-						.setCustomId(JSON.stringify({ action: 'claim' }))
-						.setStyle(ButtonStyle.Secondary)
-						.setEmoji(getMessage('buttons.claim.emoji'))
-						.setLabel(getMessage('buttons.claim.text')),
-				);
-			}
-
-			if (ticket.guild.closeButton) {
-				components.addComponents(
-					new ButtonBuilder()
-						.setCustomId(JSON.stringify({ action: 'close' }))
-						.setStyle(ButtonStyle.Danger)
-						.setEmoji(getMessage('buttons.close.emoji'))
-						.setLabel(getMessage('buttons.close.text')),
-				);
-			}
-
-			await openingMessage.edit({ components: [components] });
-		}
-
-		await interaction.editReply({
-			embeds: [
-				new ExtendedEmbedBuilder()
-					.setColor(ticket.guild.primaryColour)
-					.setDescription(getMessage('ticket.released', { user: interaction.user.toString() })),
-			],
-		});
-
-		logTicketEvent(this.client, {
-			action: 'unclaim',
-			target: {
-				id: ticket.id,
-				name: interaction.channel.toString(),
-			},
-			userId: interaction.user.id,
-		});
-	}
 
 	buildFeedbackModal(locale, id) {
 		const getMessage = this.client.i18n.getLocale(locale);
