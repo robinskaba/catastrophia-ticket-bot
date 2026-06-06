@@ -5,13 +5,15 @@ FROM oven/bun:1 AS builder
 WORKDIR /build
 
 COPY --link scripts scripts
-RUN chmod +x ./scripts/start.sh
+RUN sed -i 's/\r$//' ./scripts/start.sh && chmod +x ./scripts/start.sh
 
 COPY package.json bun.lock ./
 
 RUN CI=true bun install --production --frozen-lockfile
 
 COPY --link . .
+
+RUN sed -i 's/\r$//' ./scripts/start.sh && chmod +x ./scripts/start.sh
 
 FROM node:22-alpine3.20 AS runner
 LABEL org.opencontainers.image.source=https://github.com/discord-tickets/bot \

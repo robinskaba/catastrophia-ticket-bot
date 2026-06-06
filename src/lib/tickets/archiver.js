@@ -133,13 +133,32 @@ module.exports = class TicketArchiver {
 				);
 			}
 
-			const contentStr = JSON.stringify({
-				attachments: [...message.attachments.values()].map(a => ({
+			const fs = require('fs');
+			const { join } = require('path');
+			const userAttachmentsDir = join(process.cwd(), 'user', 'attachments');
+			if (!fs.existsSync(userAttachmentsDir)) fs.mkdirSync(userAttachmentsDir, { recursive: true });
+
+			const attachments = [];
+			for (const a of message.attachments.values()) {
+				const att = {
 					contentType: a.contentType,
 					filename: a.name || a.filename || 'attachment',
 					id: a.id,
 					url: a.url || a.attachment,
-				})),
+				};
+				if (att.contentType?.match(/image\/(png|jpe?g|gif|webp)/i)) {
+					// download to local disk instead of db to avoid P2000 text limit
+					fetch(att.url).then(res => res.ok ? res.arrayBuffer() : null).then(buffer => {
+						if (buffer) {
+							fs.writeFileSync(join(userAttachmentsDir, `${att.id}_${att.filename}`), Buffer.from(buffer));
+						}
+					}).catch(() => {});
+				}
+				attachments.push(att);
+			}
+
+			const contentStr = JSON.stringify({
+				attachments,
 				components: [...message.components.values()],
 				content: message.content || '',
 				embeds: message.embeds.map(embed => ({ ...embed })),

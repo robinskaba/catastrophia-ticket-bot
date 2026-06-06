@@ -81,12 +81,36 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			ticket,
 		}));
 
-		// Set isImage flag on attachments so they can be easily rendered in the template
-		ticket.archivedMessages?.forEach(msg => {
-			msg.content?.attachments?.forEach(a => {
-				a.isImage = !!a.contentType?.match(/image\/(png|jpe?g|gif|webp)/i);
-			});
-		});
+		// Set isImage flag on attachments and convert to base64 so they can be rendered reliably in the template
+		if (ticket.archivedMessages) {
+			const promises = [];
+			for (const msg of ticket.archivedMessages) {
+				if (!msg.content?.attachments) continue;
+				for (const a of msg.content.attachments) {
+					a.isImage = !!a.contentType?.match(/image\/(png|jpe?g|gif|webp)/i);
+					if (a.isImage && !(a.url || a.attachment)?.startsWith('data:')) {
+						const localPath = join(process.cwd(), 'user', 'attachments', `${a.id}_${a.filename}`);
+						if (fs.existsSync(localPath)) {
+							const buffer = fs.readFileSync(localPath);
+							a.url = `data:${a.contentType};base64,${buffer.toString('base64')}`;
+						} else {
+							// fallback network fetch
+							promises.push(
+								fetch(a.url || a.attachment)
+									.then(res => {
+										if (!res.ok) return;
+										return res.arrayBuffer().then(buffer => {
+											a.url = `data:${a.contentType};base64,${Buffer.from(buffer).toString('base64')}`;
+										});
+									})
+									.catch(() => {})
+							);
+						}
+					}
+				}
+			}
+			await Promise.all(promises);
+		}
 
 		const channelName = ticket.category.channelName
 			.replace(/{+\s?(user)?name\s?}+/gi, ticket.createdBy?.username || 'unknown')
