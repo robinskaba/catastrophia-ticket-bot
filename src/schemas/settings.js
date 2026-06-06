@@ -11,7 +11,7 @@ module.exports = joi.object({
 	id: joi.string().optional(),
 	logChannel: joi.string().optional(),
 	primaryColour: joi.string().optional(),
-	staleAfter: joi.number().min(60_000).optional(),
+	staleAfter: joi.number().optional(),
 	successColour: joi.string().optional(),
 	workingHours: joi.array().length(8).items(
 		joi.string(),

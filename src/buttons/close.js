@@ -73,7 +73,7 @@ module.exports = class CloseButton extends Button {
 						});
 
 					} finally { // this should run regardless of whatever happens above
-						client.tickets.$stale.delete(ticket.id);
+
 					}
 				}
 			}

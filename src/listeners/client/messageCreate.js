@@ -217,13 +217,6 @@ module.exports = class extends Listener {
 						data,
 						where: { id: ticket.id },
 					});
-
-					// if the ticket was set as stale, unset it
-					if (client.tickets.$stale.has(ticket.id)) {
-						const $ticket = client.tickets.$stale.get(ticket.id);
-						await message.channel.messages.delete($ticket.message.id).catch(() => {});
-						client.tickets.$stale.delete(ticket.id);
-					}
 				}
 			}
 

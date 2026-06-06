@@ -49,7 +49,7 @@ module.exports = class TicketManager {
 		this.archiver = new TicketArchiver(client);
 		this.$count = { categories: {} };
 		this.$numbers = {};
-		this.$stale = new Collection();
+
 	}
 
 	/**
@@ -1079,7 +1079,7 @@ module.exports = class TicketManager {
 	 * | import("discord.js").ModalSubmitInteraction} interaction
 	 */
 	async acceptClose(interaction) {
-		await this.finallyClose(interaction.channel.id, this.$stale.get(interaction.channel.id) || {});
+		await this.finallyClose(interaction.channel.id, {});
 	}
 
 	/**
@@ -1129,7 +1129,7 @@ module.exports = class TicketManager {
 				},
 				where: { id: ticket.id },
 			});
-			if (this.$stale.has(ticketId)) this.$stale.delete(ticketId);
+
 			this.$count.categories[ticket.categoryId] ??= {};
 			this.$count.categories[ticket.categoryId].total -= 1;
 			this.$count.categories[ticket.categoryId][ticket.createdById] -= 1;
