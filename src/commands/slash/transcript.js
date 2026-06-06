@@ -25,9 +25,10 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			nameLocalizations: client.i18n.getAllMessages(`commands.slash.${name}.name`),
 			options: [
 				{
-					name: 'member',
+					autocomplete: true,
+					name: 'category',
 					required: true,
-					type: ApplicationCommandOptionType.User,
+					type: ApplicationCommandOptionType.Integer,
 				},
 				{
 					autocomplete: true,
@@ -37,7 +38,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 				},
 			].map(option => {
 				option.descriptionLocalizations = client.i18n.getAllMessages(`commands.slash.${name}.options.${option.name}.description`);
-				option.description = option.descriptionLocalizations['en-GB'];
+				option.description = option.descriptionLocalizations['en-GB'] || `Select the ${option.name}`;
 				option.nameLocalizations = client.i18n.getAllMessages(`commands.slash.${name}.options.${option.name}.name`);
 				return option;
 			}),
@@ -163,7 +164,7 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 
 		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		ticketId = ticketId || interaction.options.getString('ticket', true);
-		const member = interaction.options.getUser('member');
+		const category = interaction.options.getInteger('category', true);
 
 		const where = interaction.guildId && ticketId.length < 16
 			? {
@@ -174,9 +175,10 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			}
 			: { id: ticketId };
 
-		if (member) {
-			if (where.id) {
-				const ticket = await client.prisma.ticket.findFirst({
+		if (category !== -1) where.categoryId = category;
+
+		if (where.id || where.guildId_number) {
+			const ticket = await client.prisma.ticket.findFirst({
 					include: {
 						archivedChannels: true,
 						archivedMessages: {
@@ -193,17 +195,12 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 						guild: true,
 						questionAnswers: { include: { question: true } },
 					},
-					where: {
-						...where,
-						createdById: member.id,
-					},
+					where,
 				});
 				return this.handleResult(interaction, ticket, ticketId);
-			} else {
-				where.createdById = member.id;
-			}
 		}
 
+		// If no specific ticketId was matched above (which shouldn't happen due to required ticket option, but just in case)
 		const ticket = await client.prisma.ticket.findUnique({
 			include: {
 				archivedChannels: true,

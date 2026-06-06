@@ -22,11 +22,12 @@ module.exports = class TicketCompleter extends Autocompleter {
 		interaction,
 		open,
 		userId,
+		categoryId,
 	}) {
 		/** @type {import("client")} */
 		const client = this.client;
 		const guildId = interaction.guild.id;
-		const cacheKey = [guildId, userId, open].join('/');
+		const cacheKey = [guildId, userId || 'all', categoryId || 'all', open].join('/');
 
 		let tickets = await this.cache.get(cacheKey);
 
@@ -44,7 +45,8 @@ module.exports = class TicketCompleter extends Autocompleter {
 				},
 				orderBy: { createdAt: 'desc' },
 				where: {
-					createdById: userId,
+					...(userId ? { createdById: userId } : {}),
+					...(categoryId ? { categoryId } : {}),
 					guildId,
 					open,
 				},
@@ -93,14 +95,23 @@ module.exports = class TicketCompleter extends Autocompleter {
 	 * @param {import("discord.js").AutocompleteInteraction} interaction
 	 */
 	async run(value, command, interaction) {
-		const memberOption = interaction.options.get('member');
-		const otherMember = await isStaff(interaction.guild, interaction.user.id) && memberOption?.value;
-		const userId = otherMember || interaction.user.id;
+		const categoryOption = interaction.options.get('category');
+		const isUserStaff = await isStaff(interaction.guild, interaction.user.id);
+		
+		let userId;
+		if (!isUserStaff) {
+			userId = interaction.user.id;
+		}
+
+		let categoryId = categoryOption?.value;
+		if (categoryId === -1) categoryId = undefined;
+
 		await interaction.respond(
 			await this.getOptions(value, {
 				interaction,
-				open: ['add', 'close', 'force-close', 'remove'].includes(command.name),  // false for `new`, `transcript` etc
+				open: ['add', 'close', 'force-close', 'remove'].includes(command.name),
 				userId,
+				categoryId,
 			}),
 		);
 	}

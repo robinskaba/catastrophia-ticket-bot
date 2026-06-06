@@ -25,13 +25,17 @@ module.exports = class CategoryCompleter extends Autocompleter {
 		}
 
 		const options = value ? categories.filter(category => category.name.match(new RegExp(value, 'i'))) : categories;
-		await interaction.respond(
-			options
+		let results = options
 				.slice(0, 25)
 				.map(category => ({
 					name: category.name,
 					value: category.id,
-				})),
-		);
+				}));
+
+		if (command.name === 'transcript') {
+			results.unshift({ name: 'All', value: -1 });
+		}
+
+		await interaction.respond(results.slice(0, 25));
 	}
 };
