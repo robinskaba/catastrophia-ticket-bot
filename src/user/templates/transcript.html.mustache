@@ -194,8 +194,7 @@
                         {{ /isImage }}
                         {{ ^isImage }}
                             {{ #isVideo }}
-                                <video controls style="max-width: 100%; max-height: 500px; border-radius: 4px;">
-                                    <source src="{{ url }}" type="{{ contentType }}">
+                                <video src="{{ url }}" controls style="max-width: 100%; max-height: 500px; border-radius: 4px;">
                                     Your browser does not support the video tag.
                                 </video>
                             {{ /isVideo }}
