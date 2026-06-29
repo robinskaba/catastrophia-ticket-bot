@@ -45,7 +45,7 @@ module.exports = class TicketCompleter extends Autocompleter {
 				open,
 			};
 
-			if (timeframe) {
+			if (timeframe && timeframe !== 'all') {
 				const date = new Date();
 				date.setDate(date.getDate() - parseInt(timeframe));
 				where.createdAt = { gte: date };
@@ -106,12 +106,11 @@ module.exports = class TicketCompleter extends Autocompleter {
 	 */
 	async run(value, command, interaction) {
 		const categoryOption = interaction.options.get('category');
-		const userOption = interaction.options.get('user');
 		const timeframeOption = interaction.options.get('timeframe');
 		
 		const isUserStaff = await isStaff(interaction.guild, interaction.user.id);
 		
-		let userId = userOption?.value;
+		let userId;
 		if (!isUserStaff) {
 			userId = interaction.user.id;
 		}
