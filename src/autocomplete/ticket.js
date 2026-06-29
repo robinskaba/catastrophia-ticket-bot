@@ -23,11 +23,12 @@ module.exports = class TicketCompleter extends Autocompleter {
 		open,
 		userId,
 		categoryId,
+		timeframe,
 	}) {
 		/** @type {import("client")} */
 		const client = this.client;
 		const guildId = interaction.guild.id;
-		const cacheKey = [guildId, userId || 'all', categoryId || 'all', open].join('/');
+		const cacheKey = [guildId, userId || 'all', categoryId || 'all', open, timeframe || 'all', value || 'none'].join('/');
 
 		let tickets = await this.cache.get(cacheKey);
 
@@ -37,6 +38,19 @@ module.exports = class TicketCompleter extends Autocompleter {
 				select: { locale: true },
 				where: { id: guildId },
 			});
+			const where = {
+				...(userId ? { createdById: userId } : {}),
+				...(categoryId ? { categoryId } : {}),
+				guildId,
+				open,
+			};
+
+			if (timeframe) {
+				const date = new Date();
+				date.setDate(date.getDate() - parseInt(timeframe));
+				where.createdAt = { gte: date };
+			}
+
 			tickets = await client.prisma.ticket.findMany({
 				include: {
 					archivedUsers: true,
@@ -44,12 +58,8 @@ module.exports = class TicketCompleter extends Autocompleter {
 					createdBy: true,
 				},
 				orderBy: { createdAt: 'desc' },
-				where: {
-					...(userId ? { createdById: userId } : {}),
-					...(categoryId ? { categoryId } : {}),
-					guildId,
-					open,
-				},
+				where,
+				take: 10,
 			});
 
 			tickets = await Promise.all(
@@ -96,15 +106,20 @@ module.exports = class TicketCompleter extends Autocompleter {
 	 */
 	async run(value, command, interaction) {
 		const categoryOption = interaction.options.get('category');
+		const userOption = interaction.options.get('user');
+		const timeframeOption = interaction.options.get('timeframe');
+		
 		const isUserStaff = await isStaff(interaction.guild, interaction.user.id);
 		
-		let userId;
+		let userId = userOption?.value;
 		if (!isUserStaff) {
 			userId = interaction.user.id;
 		}
 
 		let categoryId = categoryOption?.value;
 		if (categoryId === -1) categoryId = undefined;
+		
+		let timeframe = timeframeOption?.value;
 
 		await interaction.respond(
 			await this.getOptions(value, {
@@ -112,6 +127,7 @@ module.exports = class TicketCompleter extends Autocompleter {
 				open: ['close', 'remove'].includes(command.name),
 				userId,
 				categoryId,
+				timeframe,
 			}),
 		);
 	}

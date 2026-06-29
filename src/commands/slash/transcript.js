@@ -36,9 +36,36 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 					required: true,
 					type: ApplicationCommandOptionType.String,
 				},
+				{
+					name: 'user',
+					required: false,
+					type: ApplicationCommandOptionType.User,
+				},
+				{
+					name: 'timeframe',
+					required: false,
+					type: ApplicationCommandOptionType.String,
+					choices: [
+						{ name: 'Last 7 Days', value: '7' },
+						{ name: 'Last 14 Days', value: '14' },
+						{ name: 'Last Month', value: '30' },
+						{ name: 'Last 3 Months', value: '90' },
+					],
+				},
 			].map(option => {
 				option.descriptionLocalizations = client.i18n.getAllMessages(`commands.slash.${name}.options.${option.name}.description`);
-				option.description = option.descriptionLocalizations['en-GB'] || `Select the ${option.name}`;
+				if (!option.descriptionLocalizations['en-GB'] || Object.keys(option.descriptionLocalizations).length === 0) {
+					// Fallback for options that don't have i18n
+					if (option.name === 'user') {
+						option.description = 'Filter tickets by user';
+					} else if (option.name === 'timeframe') {
+						option.description = 'Filter tickets by time frame';
+					} else {
+						option.description = `Select the ${option.name}`;
+					}
+				} else {
+					option.description = option.descriptionLocalizations['en-GB'] || `Select the ${option.name}`;
+				}
 				option.nameLocalizations = client.i18n.getAllMessages(`commands.slash.${name}.options.${option.name}.name`);
 				return option;
 			}),
