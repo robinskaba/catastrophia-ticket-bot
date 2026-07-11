@@ -6,6 +6,9 @@ const {
 } = require('discord.js');
 const fs = require('fs');
 const { join } = require('path');
+const zlib = require('zlib');
+const { promisify } = require('util');
+const gzip = promisify(zlib.gzip);
 const Mustache = require('mustache');
 const { AttachmentBuilder } = require('discord.js');
 const ExtendedEmbedBuilder = require('../../lib/embed');
@@ -298,8 +301,25 @@ module.exports = class TranscriptSlashCommand extends SlashCommand {
 			fileName,
 			transcript,
 		} = await this.fillTemplate(ticket);
-		const attachment = new AttachmentBuilder(Buffer.from(transcript), { name: fileName });
 
+		const MAX_SIZE = 8 * 1024 * 1024; // 8 MB (Discord's base upload limit)
+		let buffer = Buffer.from(transcript);
+		let finalName = fileName;
+
+		if (buffer.length > MAX_SIZE) {
+			// Try gzip compression first
+			buffer = await gzip(buffer, { level: zlib.constants.Z_BEST_COMPRESSION });
+			finalName = `${fileName}.gz`;
+
+			if (buffer.length > MAX_SIZE) {
+				// Still too large — strip base64-embedded images and re-compress
+				const stripped = transcript.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, 'data:image/png;base64,');
+				buffer = await gzip(Buffer.from(stripped), { level: zlib.constants.Z_BEST_COMPRESSION });
+				finalName = `${fileName}.gz`;
+			}
+		}
+
+		const attachment = new AttachmentBuilder(buffer, { name: finalName });
 		await interaction.editReply({ files: [attachment] });
 	}
 };
